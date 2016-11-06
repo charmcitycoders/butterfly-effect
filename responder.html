@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset=utf-8 />
+    <title>Responder</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <link href='http://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+
+<script src="http://cdn.pubnub.com/pubnub-3.7.14.min.js"></script>
+<script async defer
+src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCEEPv_JweI4ZWPJ8EnV0OykQSFF6aBxQ0"> 
+</script>
+
+<script>
+var channel ='my_channel';
+var uuid = PUBNUB.uuid();
+var personalChannel='pc_'+uuid;
+var areasOfService=['21244','Windsor Mill','MD','caller_channel',personalChannel];
+var pubnub = PUBNUB.init({
+    subscribe_key: "sub-c-e3bc288c-9271-11e6-8409-0619f8945a4f",
+    publish_key: "pub-c-59d8231f-8983-4fbb-98a9-434f744d2910",
+    uuid: uuid,
+//    ssl: true,
+//    presenceTimeout: 130,
+})
+
+console.log("this responder's uuid: "+uuid);
+console.log("subscribing to channel: caller_channel");
+pubnub.subscribe({
+   channel: areasOfService,
+    message: function(message,env,channel){
+        if(message.msg==='confirmRspndr'){
+            alert("Confirm this responder to message.seekerUUID: "+message.seekerUUID);
+            $("#confirmationButton").append("<button id='confirmResponse'>Confirm response with Nolaxone</button><button id='declineResponse'>Decline response with Nolaxone</button>");
+            $("#confirmResponse").click(function(){
+                sendOnTheWayConfirmation(message.seekerUUID,'confirming_on_the_way');
+            });
+            $("#declineResponse").click(function(){
+                sendOnTheWayConfirmation(message.seekerUUID,'confirming_not_on_the_way');
+            });
+        }else{
+            alert("Help request broadcast");
+            console.log("received help signal...responding back with location");
+            getLocation();
+        }
+    }
+})
+
+function sendCancelResponse(seekerChannel,msgtosend){
+    pubnub.publish(
+        {
+            message: {
+                msg: msgtosend,
+                rspndruuid:'pc_'+uuid
+            },
+           channel: 'pc_'+seekerChannel,
+            sendByPost: false, // true to send via post
+            storeInHistory: false, //override default storage options
+            meta: {
+                "cool": "meta"
+            }   // publish extra meta with the request
+        },
+        function (status, response) {
+            if (status.error) {
+                // handle error
+                console.log(status);
+            } else {
+                console.log("geolcation sent to caller - status & response: "+status+" | "+response);//, response.timetoken)
+            }
+        }
+    );    
+};
+
+function sendOnTheWayConfirmation(seekerChannel,msgtosend){
+    console.log("in sendRspondrLocation(thisPosition) with msgtosend: "+msgtosend);
+    if(msgtosend==='confirming_on_the_way'){
+        $("#confirmationButton").empty();
+        $("#confirmationButton").append("DISPLAY MAP & DIRECTIONS");
+        console.log("show map and direction");
+        $("#confirmationButton").append("<br><button id='cancelResponse'>Cancel Response</button>");
+        $("#cancelResponse").click(function(){
+            sendCancelResponse(seekerChannel,'cancel_response');
+            $("#confirmationButton").empty();
+            $("#confirmationButton").append("hmmm...ok...hope you are ok!!!");
+        });
+    }else if(msgtosend==='confirming_not_on_the_way'){
+        $("#confirmationButton").empty();
+        $("#confirmationButton").append("What the heck man!");
+        //LOG THIS RESPONSE WITH THIE UUID
+    }
+    pubnub.publish(
+        {
+            message: {
+                msg: msgtosend,
+                rspndruuid:'pc_'+uuid
+            },
+           channel: 'pc_'+seekerChannel,
+            sendByPost: false, // true to send via post
+            storeInHistory: false, //override default storage options
+            meta: {
+                "cool": "meta"
+            }   // publish extra meta with the request
+        },
+        function (status, response) {
+            if (status.error) {
+                // handle error
+                console.log(status);
+            } else {
+                console.log("geolcation sent to caller - status & response: "+status+" | "+response);//, response.timetoken)
+            }
+        }
+    );
+};
+
+function getLocation() {
+    console.log("in getLocation");
+    if (navigator.geolocation) {
+        console.log("location found...sending to caller client");
+        navigator.geolocation.getCurrentPosition(sendRspondrLocation);
+    } else { 
+        alert("Geolocation is not supported by this browser.");
+    }
+}
+
+function sendRspondrLocation(thisPosition){
+    console.log("in sendRspondrLocation(thisPosition) with: "+thisPosition);
+    pubnub.publish(
+        {
+            message: { 
+                msg: 'a message object from drvr',
+                rspndruuid:uuid,
+                position:{
+                    latitude:thisPosition.coords.latitude,
+                    longitude:thisPosition.coords.longitude
+                }
+            },
+           channel: "caller_channel_rspndrlocxn",
+            sendByPost: false, // true to send via post
+            storeInHistory: false, //override default storage options
+            meta: {
+                "cool": "meta"
+            }   // publish extra meta with the request
+        },
+        function (status, response) {
+            if (status.error) {
+                // handle error
+                console.log(status);
+            } else {
+                console.log("geolcation sent to caller - status & response: "+status+" | "+response);//, response.timetoken)
+            }
+        }
+    );
+};
+</script>
+</head>
+<body>
+<!--<button onClick='publishThis()'>Submit</button>-->
+<br><br><br>
+<div id="mapholder"></div>
+<div id="confirmationButton"></div>
+  </body>
+</html>
